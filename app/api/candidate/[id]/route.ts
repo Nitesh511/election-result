@@ -2,13 +2,12 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import { NextRequest } from "next/server";
 
-// ─── In-memory cache ───────────────────────────────────────────────
+// ─── In-memory cache ───────────────────────────────────────────────────────────
 const cache = new Map<
   string,
   { data: Record<string, string>; cachedAt: number }
 >();
 
-// Short TTL during active election (5 mins), longer otherwise
 const ELECTION_DATE = new Date("2026-03-05");
 
 const isElectionDay = () => {
@@ -19,31 +18,41 @@ const isElectionDay = () => {
 const isElectionPeriod = () => {
   const today = new Date();
   const dayAfter = new Date(ELECTION_DATE);
-  dayAfter.setDate(dayAfter.getDate() + 2); // short cache 2 days after election
+  dayAfter.setDate(dayAfter.getDate() + 2);
   return today >= ELECTION_DATE && today <= dayAfter;
 };
 
 const getCacheTTL = () => {
-  if (isElectionDay()) return 2 * 60 * 1000; // 2 mins
-  if (isElectionPeriod()) return 10 * 60 * 1000; // 10 mins
-  return 60 * 60 * 1000; // 1 hour
+  if (isElectionDay()) return 2 * 60 * 1000;      // 2 mins
+  if (isElectionPeriod()) return 10 * 60 * 1000;   // 10 mins
+  return 60 * 60 * 1000;                            // 1 hour
 };
 
-// ─── Rate limiter ──────────────────────────────────────────────────
+// ─── These headers tell Netlify's CDN to NEVER cache this route ───────────────
+const NO_CACHE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+  "Surrogate-Control": "no-store",
+  "CDN-Cache-Control": "no-store",
+  "Netlify-CDN-Cache-Control": "no-store",  // ← key header for Netlify edge cache
+  "Pragma": "no-cache",
+  "Expires": "0",
+};
+
+// ─── Rate limiter ──────────────────────────────────────────────────────────────
 const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
 const RATE_LIMIT = 10;
 const RATE_WINDOW_MS = 60 * 1000;
 
-// ─── Delay helper ─────────────────────────────────────────────────
+// ─── Delay helper ─────────────────────────────────────────────────────────────
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
-// ─── Fetch with retry + CDN bust ──────────────────────────────────
+// ─── Fetch with retry + CDN bust ──────────────────────────────────────────────
 async function fetchWithRetry(
   url: string,
   retries = 3,
   delayMs = 1000,
 ): Promise<string> {
-  const bustUrl = `${url}&_=${Date.now()}`; // timestamp cache-buster
+  const bustUrl = `${url}&_=${Date.now()}`;
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -74,7 +83,7 @@ async function fetchWithRetry(
   throw new Error("All retry attempts failed");
 }
 
-// ─── Scraper ───────────────────────────────────────────────────────
+// ─── Scraper ──────────────────────────────────────────────────────────────────
 function scrape(html: string): Record<string, string> {
   const $ = cheerio.load(html);
   const result: Record<string, string> = {};
@@ -93,7 +102,7 @@ function scrape(html: string): Record<string, string> {
   return result;
 }
 
-// ─── Route handler ────────────────────────────────────────────────
+// ─── Route handler ────────────────────────────────────────────────────────────
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
@@ -102,7 +111,7 @@ export async function GET(
   const now = Date.now();
   const forceRefresh = request.nextUrl.searchParams.get("refresh") === "true";
 
-  // ─── Rate limiting ───────────────────────────────────────────────
+  // ─── Rate limiting ─────────────────────────────────────────────────────────
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
   const rateEntry = rateLimitMap.get(ip) ?? { count: 0, windowStart: now };
 
@@ -116,11 +125,11 @@ export async function GET(
   if (rateEntry.count > RATE_LIMIT) {
     return Response.json(
       { error: "Too many requests. Please slow down." },
-      { status: 429, headers: { "Retry-After": "60" } },
+      { status: 429, headers: { ...NO_CACHE_HEADERS, "Retry-After": "60" } },
     );
   }
 
-  // ─── Cache check ────────────────────────────────────────────────
+  // ─── Cache check (skipped on Netlify since it's serverless/stateless) ───────
   const IS_NETLIFY = process.env.NETLIFY === "true";
   const cached = cache.get(id);
   const ttl = getCacheTTL();
@@ -129,45 +138,43 @@ export async function GET(
     console.log(`Cache HIT for candidate ${id}`);
     return Response.json(cached.data, {
       headers: {
+        ...NO_CACHE_HEADERS,
         "X-Cache": "HIT",
         "X-Cache-Age": `${Math.floor((now - cached.cachedAt) / 1000)}s`,
         "X-Cache-TTL": `${Math.floor(ttl / 1000)}s`,
-        "Cache-Control": "no-store, max-age=0",
       },
     });
   }
 
-  // ─── Fetch fresh data ───────────────────────────────────────────
+  // ─── Fetch fresh data ──────────────────────────────────────────────────────
   try {
-    // Force cache-busting to always get latest 2026 data
     const url = `https://election.ekantipur.com/profile/${id}?lng=eng&_=${Date.now()}`;
     console.log(`Cache MISS for candidate ${id} — fetching fresh data`);
     const html = await fetchWithRetry(url);
     const result = scrape(html);
 
-    // Store in in-memory cache
     cache.set(id, { data: result, cachedAt: now });
 
     return Response.json(result, {
       headers: {
+        ...NO_CACHE_HEADERS,
         "X-Cache": "MISS",
         "X-Cache-TTL": `${Math.floor(ttl / 1000)}s`,
-        "Cache-Control": "no-store, max-age=0",
-        "Surrogate-Control": "no-store",
       },
     });
   } catch (err) {
     console.error(`Failed to fetch candidate ${id}:`, err);
 
-    // Return stale cache if exists
     if (cached) {
       console.warn(`Returning stale cache for candidate ${id}`);
-      return Response.json(cached.data, { headers: { "X-Cache": "STALE" } });
+      return Response.json(cached.data, {
+        headers: { ...NO_CACHE_HEADERS, "X-Cache": "STALE" },
+      });
     }
 
     return Response.json(
       { error: "Failed to fetch candidate data. Please try again later." },
-      { status: 502 },
+      { status: 502, headers: NO_CACHE_HEADERS },
     );
   }
 }
