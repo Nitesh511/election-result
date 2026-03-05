@@ -3,7 +3,10 @@ import * as cheerio from "cheerio";
 import { NextRequest } from "next/server";
 
 // ─── In-memory cache ───────────────────────────────────────────────
-const cache = new Map<string, { data: Record<string, string>; cachedAt: number }>();
+const cache = new Map<
+  string,
+  { data: Record<string, string>; cachedAt: number }
+>();
 
 // Short TTL during active election (5 mins), longer otherwise
 const ELECTION_DATE = new Date("2026-03-05");
@@ -35,7 +38,11 @@ const RATE_WINDOW_MS = 60 * 1000;
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 // ─── Fetch with retry + CDN bust ──────────────────────────────────
-async function fetchWithRetry(url: string, retries = 3, delayMs = 1000): Promise<string> {
+async function fetchWithRetry(
+  url: string,
+  retries = 3,
+  delayMs = 1000,
+): Promise<string> {
   const bustUrl = `${url}&_=${Date.now()}`; // timestamp cache-buster
 
   for (let attempt = 1; attempt <= retries; attempt++) {
@@ -43,18 +50,24 @@ async function fetchWithRetry(url: string, retries = 3, delayMs = 1000): Promise
       const { data } = await axios.get(bustUrl, {
         timeout: 15000,
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+          "X-Forwarded-For": "103.0.0.1",
+          "CF-Connecting-IP": "103.0.0.1",
           "Accept-Language": "ne-NP,ne;q=0.9,en-US;q=0.8,en;q=0.7",
           "Cache-Control": "no-cache, no-store, must-revalidate",
-          "Pragma": "no-cache",
-          "Referer": "https://election.ekantipur.com/",
+          Pragma: "no-cache",
+          Referer: "https://election.ekantipur.com/",
         },
       });
       return data;
     } catch (err) {
       if (attempt === retries) throw err;
-      console.warn(`Attempt ${attempt} failed. Retrying in ${delayMs * attempt}ms...`);
+      console.warn(
+        `Attempt ${attempt} failed. Retrying in ${delayMs * attempt}ms...`,
+      );
       await delay(delayMs * attempt);
     }
   }
@@ -83,7 +96,7 @@ function scrape(html: string): Record<string, string> {
 // ─── Route handler ────────────────────────────────────────────────
 export async function GET(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
   const now = Date.now();
@@ -103,7 +116,7 @@ export async function GET(
   if (rateEntry.count > RATE_LIMIT) {
     return Response.json(
       { error: "Too many requests. Please slow down." },
-      { status: 429, headers: { "Retry-After": "60" } }
+      { status: 429, headers: { "Retry-After": "60" } },
     );
   }
 
@@ -154,7 +167,7 @@ export async function GET(
 
     return Response.json(
       { error: "Failed to fetch candidate data. Please try again later." },
-      { status: 502 }
+      { status: 502 },
     );
   }
 }
