@@ -33,15 +33,32 @@ const RATE_WINDOW_MS = 60 * 1000;
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 async function fetchWithRetry(url: string, retries = 3, delayMs = 1000): Promise<string> {
+  // Add a timestamp cache-buster so Ekantipur CDN never serves stale HTML
+  const bustUrl = `${url}&_t=${Date.now()}`;
+
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const { data } = await axios.get(url, {
-        timeout: 8000,
+      const { data } = await axios.get(bustUrl, {
+        timeout: 10000,
         headers: {
-          // Prevent getting a cached response from the upstream server
+          // Realistic Nepali browser fingerprint — Ekantipur CDN serves
+          // different (often stale) content to non-Nepal / bot requests.
+          // Mimicking a real Nepali Chrome user fixes the Netlify US-server issue.
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+          "Accept-Language": "ne-NP,ne;q=0.9,en-US;q=0.8,en;q=0.7",
+          "Accept-Encoding": "gzip, deflate, br",
+          "Referer": "https://election.ekantipur.com/",
+          "Origin": "https://election.ekantipur.com",
           "Cache-Control": "no-cache, no-store, must-revalidate",
           "Pragma": "no-cache",
-          "User-Agent": "Mozilla/5.0 (compatible; research-bot/1.0)",
+          "Upgrade-Insecure-Requests": "1",
+          "Sec-Fetch-Dest": "document",
+          "Sec-Fetch-Mode": "navigate",
+          "Sec-Fetch-Site": "same-origin",
+          "Sec-CH-UA": '"Chromium";v="123", "Google Chrome";v="123"',
+          "Sec-CH-UA-Mobile": "?0",
+          "Sec-CH-UA-Platform": '"Windows"',
         },
       });
       return data;
@@ -105,17 +122,21 @@ export async function GET(
     );
   }
 
-  // 2. Cache check (skip if force refresh)
+  // 2. Cache check
+  // On Netlify (serverless), in-memory Map can hold stale data across
+  // warm instance reuse — so we skip the memory cache entirely on Netlify.
+  const IS_NETLIFY = process.env.NETLIFY === "true";
   const cached = cache.get(id);
   const ttl = getCacheTTL();
 
-  if (!forceRefresh && cached && now - cached.cachedAt < ttl) {
+  if (!IS_NETLIFY && !forceRefresh && cached && now - cached.cachedAt < ttl) {
     console.log(`Cache HIT for candidate ${id} (age: ${Math.floor((now - cached.cachedAt) / 1000)}s)`);
     return Response.json(cached.data, {
       headers: {
         "X-Cache": "HIT",
         "X-Cache-Age": `${Math.floor((now - cached.cachedAt) / 1000)}s`,
         "X-Cache-TTL": `${Math.floor(ttl / 1000)}s`,
+        "Cache-Control": "no-store",
       },
     });
   }
@@ -134,6 +155,9 @@ export async function GET(
       headers: {
         "X-Cache": "MISS",
         "X-Cache-TTL": `${Math.floor(ttl / 1000)}s`,
+        // Tell Netlify CDN never to cache this API response
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Surrogate-Control": "no-store",
       },
     });
   } catch (err) {
