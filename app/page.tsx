@@ -16,25 +16,39 @@ const NAME_TO_ID: { [key: string]: string } = {
   "oli": "122",
 };
 
+// ─── 2026 election date ───────────────────────────────────────────
+const ELECTION_YEAR = "2026";
+
 function resolveId(input: string): string | null {
   const lower = input.trim().toLowerCase();
   if (NAME_TO_ID[lower]) return NAME_TO_ID[lower];
   if (/^\d+$/.test(input.trim())) return input.trim();
-  // partial match
   for (const [name, id] of Object.entries(NAME_TO_ID)) {
     if (name.includes(lower) || lower.includes(name.split(" ")[0])) return id;
   }
   return null;
 }
 
+// ─── Check if data is from 2026 election ─────────────────────────
+function is2026Data(data: CandidateData): boolean {
+  const electionDate = data["Election date"] || data["Election Date"] || "";
+  // If it mentions 2017 or 2022 or anything not 2026, it's old data
+  if (electionDate.includes("2017") || electionDate.includes("2022") || electionDate.includes("2019")) {
+    return false;
+  }
+  // If it explicitly says 2026, it's new
+  if (electionDate.includes(ELECTION_YEAR)) return true;
+  // If no election date at all, assume it could be new (no data yet)
+  if (!electionDate) return true;
+  return false;
+}
+
 function getVotes(data: CandidateData): number {
-  // ONLY read "Total Votes" — never fall back to other fields
-  // to avoid picking up numbers from Birth Date, Age, etc.
+  if (!is2026Data(data)) return 0; // old data = show 0
   const raw = (data["Total Votes"] || "").replace(/,/g, "").trim();
   if (!raw || raw === "--" || raw === "-") return 0;
   const parsed = parseInt(raw, 10);
-  // Must be a realistic vote count (> 100) to avoid garbage values
-  return (!isNaN(parsed) && parsed > 100) ? parsed : 0;
+  return !isNaN(parsed) ? parsed : 0;
 }
 
 function getName(data: CandidateData, fallback: string): string {
@@ -43,31 +57,33 @@ function getName(data: CandidateData, fallback: string): string {
 
 function getParty(data: CandidateData): string {
   return data["Political Party"]
-    || data[Object.keys(data).find(k => k.toLowerCase().includes("party")) ?? ""] 
+    || data[Object.keys(data).find(k => k.toLowerCase().includes("party")) ?? ""]
     || "—";
 }
 
 function getStatus(data: CandidateData): string {
+  if (!is2026Data(data)) return ""; // don't show old result status
   const val = data["Election Result"] || data["Status"] || data["Result"] || "";
   return (val === "--" || val === "-") ? "" : val;
 }
 
 function isWon(data: CandidateData): boolean {
+  if (!is2026Data(data)) return false;
   const s = getStatus(data).toLowerCase();
   return s.includes("won") || s.includes("elected") || s.includes("निर्वाचित");
 }
 
 function isPending(data: CandidateData): boolean {
-  // Pending if: no result declared AND no votes counted yet
+  // Always pending if data is from old election
+  if (!is2026Data(data)) return true;
   const result = (data["Election Result"] || "").trim();
   const votes = getVotes(data);
   const noResult = result === "" || result === "--" || result === "-";
-  const noVotes = votes === 0;
-  return noResult && noVotes;
+  return noResult || votes === 0;
 }
 
 function splitFields(data: CandidateData) {
-  const electionKeys = ["status", "result", "votes", "constituency", "position", "rank", "party", "symbol"];
+  const electionKeys = ["status", "result", "votes", "constituency", "position", "rank", "party", "symbol", "election date"];
   const election: CandidateData = {};
   const personal: CandidateData = {};
   for (const [k, v] of Object.entries(data)) {
@@ -91,12 +107,15 @@ function MatchupCard({ balen, oli }: { balen: CandidateData | null; oli: Candida
   const balenPct = Math.round((balenVotes / total) * 100);
   const oliPct = 100 - balenPct;
 
+  const balenPending = balen ? isPending(balen) : true;
+  const oliPending = oli ? isPending(oli) : true;
+
   return (
     <div className="rounded-2xl border border-white/10 overflow-hidden mb-8" style={{ background: "linear-gradient(135deg, #0d1a10 0%, #0a0a18 50%, #1a0d0d 100%)" }}>
       {/* Label */}
       <div className="px-6 pt-5 pb-0">
         <p className="text-[10px] font-mono tracking-[0.3em] uppercase text-white/25">
-          ⚡ Featured Matchup
+          ⚡ Featured Matchup · 2026 Election
         </p>
       </div>
 
@@ -105,17 +124,14 @@ function MatchupCard({ balen, oli }: { balen: CandidateData | null; oli: Candida
 
         {/* ── Balen ── */}
         <div className="flex-1 flex flex-col items-center text-center">
-          {/* Photo */}
           <div className="relative mb-4">
             <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-2 border-emerald-500/40 shadow-lg shadow-emerald-900/40">
-              <img
-                src={BALEN_IMG}
-                alt="Balen Shah"
-                className="w-full h-full object-cover object-top"
-              />
+              <img src={BALEN_IMG} alt="Balen Shah" className="w-full h-full object-cover object-top" />
             </div>
-            <span className={`absolute -bottom-1 left-1/2 -translate-x-1/2 text-white text-[9px] font-mono tracking-widest uppercase px-2 py-0.5 rounded-full whitespace-nowrap ${balen ? (isPending(balen) ? "bg-yellow-600" : isWon(balen) ? "bg-emerald-600" : "bg-red-700") : "bg-white/20"}`}>
-              {balen ? (isPending(balen) ? "⏳ Pending" : isWon(balen) ? "✓ Won" : "✗ Lost") : "…"}
+            <span className={`absolute -bottom-1 left-1/2 -translate-x-1/2 text-white text-[9px] font-mono tracking-widest uppercase px-2 py-0.5 rounded-full whitespace-nowrap ${
+              balenPending ? "bg-yellow-600" : isWon(balen!) ? "bg-emerald-600" : "bg-red-700"
+            }`}>
+              {balenPending ? "⏳ Pending" : isWon(balen!) ? "✓ Won" : "✗ Lost"}
             </span>
           </div>
 
@@ -126,10 +142,12 @@ function MatchupCard({ balen, oli }: { balen: CandidateData | null; oli: Candida
             {balen ? getParty(balen) : "—"}
           </div>
           <div className="text-3xl md:text-4xl font-black tabular-nums text-emerald-300 leading-none">
-            {balen ? (balenVotes > 0 ? balenVotes.toLocaleString() : "—") : "—"}
+            {balen ? balenVotes.toLocaleString() : "—"}
           </div>
           <div className="text-[9px] text-white/25 font-mono tracking-widest uppercase mt-1">votes</div>
-          <div className="text-xs font-bold text-emerald-400/70 mt-1 font-mono">{balenVotes > 0 ? balenPct + "%" : "—"}</div>
+          <div className="md:text-xs font-bold text-emerald-400/70 mt-1 font-mono">
+            {balenVotes > 0 ? balenPct + "%" : "—"}
+          </div>
         </div>
 
         {/* ── VS divider ── */}
@@ -143,17 +161,14 @@ function MatchupCard({ balen, oli }: { balen: CandidateData | null; oli: Candida
 
         {/* ── KP Oli ── */}
         <div className="flex-1 flex flex-col items-center text-center">
-          {/* Photo */}
           <div className="relative mb-4">
             <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-2 border-red-500/40 shadow-lg shadow-red-900/40">
-              <img
-                src={OLI_IMG}
-                alt="KP Sharma Oli"
-                className="w-full h-full object-cover object-top"
-              />
+              <img src={OLI_IMG} alt="KP Sharma Oli" className="w-full h-full object-cover object-top" />
             </div>
-            <span className={`absolute -bottom-1 left-1/2 -translate-x-1/2 text-white text-[9px] font-mono tracking-widest uppercase px-2 py-0.5 rounded-full whitespace-nowrap ${oli ? (isPending(oli) ? "bg-yellow-600" : isWon(oli) ? "bg-emerald-600" : "bg-red-700") : "bg-white/20"}`}>
-              {oli ? (isPending(oli) ? "⏳ Pending" : isWon(oli) ? "✓ Won" : "✗ Lost") : "…"}
+            <span className={`absolute -bottom-1 left-1/2 -translate-x-1/2 text-white text-[9px] font-mono tracking-widest uppercase px-2 py-0.5 rounded-full whitespace-nowrap ${
+              oliPending ? "bg-yellow-600" : isWon(oli!) ? "bg-emerald-600" : "bg-red-700"
+            }`}>
+              {oliPending ? "⏳ Pending" : isWon(oli!) ? "✓ Won" : "✗ Lost"}
             </span>
           </div>
 
@@ -164,10 +179,13 @@ function MatchupCard({ balen, oli }: { balen: CandidateData | null; oli: Candida
             {oli ? getParty(oli) : "—"}
           </div>
           <div className="text-3xl md:text-4xl font-black tabular-nums text-red-300 leading-none">
-            {oli ? (oliVotes > 0 ? oliVotes.toLocaleString() : "—") : "—"}
+            {/* Always show 0 if old data, never show 57,139 from 2017 */}
+            {oli ? oliVotes.toLocaleString() : "—"}
           </div>
           <div className="text-[9px] text-white/25 font-mono tracking-widest uppercase mt-1">votes</div>
-          <div className="text-xs font-bold text-red-400/70 mt-1 font-mono">{oliVotes > 0 ? oliPct + "%" : "—"}</div>
+          <div className="md:text-xs font-bold text-red-400/70 mt-1 font-mono">
+            {oliVotes > 0 ? oliPct + "%" : "—"}
+          </div>
         </div>
       </div>
 
@@ -176,28 +194,18 @@ function MatchupCard({ balen, oli }: { balen: CandidateData | null; oli: Candida
         {balen && oli && (balenVotes > 0 || oliVotes > 0) ? (
           <>
             <div className="flex rounded-full overflow-hidden h-2.5 bg-white/5 mb-2">
-              <div
-                className="bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-1000 ease-out"
-                style={{ width: `${balenPct}%` }}
-              />
-              <div
-                className="bg-gradient-to-r from-red-500 to-red-700 transition-all duration-1000 ease-out"
-                style={{ width: `${oliPct}%` }}
-              />
+              <div className="bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-1000 ease-out" style={{ width: `${balenPct}%` }} />
+              <div className="bg-gradient-to-r from-red-500 to-red-700 transition-all duration-1000 ease-out" style={{ width: `${oliPct}%` }} />
             </div>
             <div className="flex justify-center">
               <span className="mono text-[10px] text-white/20 tracking-widest">
-                Total votes cast: <span className="text-white/40 font-bold">{(balenVotes + oliVotes) > 0 ? (balenVotes + oliVotes).toLocaleString() : "Not yet counted"}</span>
+                Total votes cast: <span className="text-white/40 font-bold">{(balenVotes + oliVotes).toLocaleString()}</span>
               </span>
             </div>
           </>
-        ) : balen && oli ? (
-          <div className="text-center text-yellow-400/40 text-xs font-mono py-2">
-            ⏳ Results not yet available — counting in progress
-          </div>
         ) : (
-          <div className="text-center text-white/20 text-xs font-mono animate-pulse py-2">
-            Loading matchup data…
+          <div className="text-center text-yellow-400/40 text-xs font-mono py-2">
+            ⏳ 2026 results not yet available — counting in progress
           </div>
         )}
       </div>
@@ -213,21 +221,30 @@ const CANDIDATE_PHOTOS: { [id: string]: string } = {
 // ─── Candidate result card ────────────────────────────────────────
 function CandidateCard({ data, id }: { data: CandidateData; id: string }) {
   const won = isWon(data);
+  const pending = isPending(data);
   const name = getName(data, `Candidate #${id}`);
   const { election, personal } = splitFields(data);
   const [showRaw, setShowRaw] = useState(false);
   const photo = CANDIDATE_PHOTOS[id];
+  const isOld = !is2026Data(data);
 
   return (
     <div className={`rounded-2xl border p-6 transition-all duration-500 ${
-      isPending(data) ? "border-yellow-500/15 bg-yellow-950/10" :
+      pending ? "border-yellow-500/15 bg-yellow-950/10" :
       won ? "border-emerald-500/20 bg-emerald-950/20"
           : "border-red-500/20 bg-red-950/20"
     }`}>
+      {/* Old data warning banner */}
+      {isOld && (
+        <div className="mb-5 rounded-lg border border-yellow-500/20 bg-yellow-900/20 px-4 py-3 text-yellow-300/70 text-xs font-mono flex items-center gap-2">
+          ⚠ Showing 2026 candidate profile — election results not yet published
+        </div>
+      )}
+
       {/* Hero */}
       <div className="flex items-center gap-5 mb-6">
         {photo && (
-          <div className={`w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden flex-shrink-0 border-2 ${isPending(data) ? "border-yellow-500/40" : won ? "border-emerald-500/40" : "border-red-500/40"} shadow-lg`}>
+          <div className={`w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden flex-shrink-0 border-2 ${pending ? "border-yellow-500/40" : won ? "border-emerald-500/40" : "border-red-500/40"} shadow-lg`}>
             <img src={photo} alt={name} className="w-full h-full object-cover object-top" />
           </div>
         )}
@@ -235,19 +252,19 @@ function CandidateCard({ data, id }: { data: CandidateData; id: string }) {
           <div className={`text-[10px] font-mono tracking-[0.25em] uppercase mb-1.5 ${won ? "text-emerald-400/60" : "text-red-400/60"}`}>
             Candidate #{id}
           </div>
-          <h2 className={`text-2xl md:text-3xl font-bold mb-2 ${won ? "text-emerald-300" : "text-red-300"}`}>
+          <h2 className={`text-2xl md:text-3xl font-bold mb-2 ${won ? "text-emerald-300" : pending ? "text-yellow-200" : "text-red-300"}`}>
             {name}
           </h2>
           <span className={`inline-block text-[10px] font-mono tracking-[0.15em] uppercase px-3 py-1 rounded ${
-            isPending(data) ? "bg-yellow-700/80 text-white" : won ? "bg-emerald-600 text-white" : "bg-red-700 text-white"
+            pending ? "bg-yellow-700/80 text-white" : won ? "bg-emerald-600 text-white" : "bg-red-700 text-white"
           }`}>
-            {isPending(data) ? "⏳ Result Pending" : getStatus(data)}
+            {pending ? "⏳ Result Pending" : getStatus(data)}
           </span>
         </div>
       </div>
 
-      {/* Election data */}
-      {Object.keys(election).length > 0 && (
+      {/* Election data — only show if 2026 */}
+      {!isOld && Object.keys(election).length > 0 && (
         <div className="mb-4">
           <p className="text-[10px] font-mono tracking-[0.2em] uppercase text-white/25 mb-3 pb-2 border-b border-white/5">
             Election Results
@@ -263,7 +280,7 @@ function CandidateCard({ data, id }: { data: CandidateData; id: string }) {
         </div>
       )}
 
-      {/* Personal data */}
+      {/* Personal data — always show */}
       {Object.keys(personal).length > 0 && (
         <div>
           <p className="text-[10px] font-mono tracking-[0.2em] uppercase text-white/25 mb-3 pb-2 border-b border-white/5">
@@ -303,11 +320,9 @@ export default function ElectionDashboard() {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  // Featured matchup data
   const [balenData, setBalenData] = useState<CandidateData | null>(null);
   const [oliData, setOliData] = useState<CandidateData | null>(null);
 
-  // Load featured matchup on mount
   useEffect(() => {
     async function loadFeatured() {
       try {
@@ -367,7 +382,6 @@ export default function ElectionDashboard() {
         .spinner { animation: spin 0.7s linear infinite; }
       `}</style>
 
-      {/* Background glow */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-indigo-600/5 rounded-full blur-3xl" />
         <div className="absolute top-1/2 -left-40 w-[400px] h-[400px] bg-emerald-600/3 rounded-full blur-3xl" />
@@ -376,17 +390,13 @@ export default function ElectionDashboard() {
       {/* ── HEADER ── */}
       <header className="relative border-b border-white/5 bg-white/[0.02] backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 md:px-8 py-4 flex flex-col md:flex-row md:items-center gap-4 md:gap-0 md:justify-between">
-          {/* Brand */}
           <div>
-            <div className="mono text-[9px] tracking-[0.3em] uppercase text-white/25 mb-0.5">
-              Nepal
-            </div>
+            <div className="mono text-[9px] tracking-[0.3em] uppercase text-white/25 mb-0.5">Nepal</div>
             <div className="text-lg font-extrabold tracking-tight text-white leading-none">
               Election <span className="text-indigo-400">Database</span>
             </div>
           </div>
 
-          {/* Search bar — right side of header */}
           <div className="flex items-stretch gap-0 w-full md:w-auto">
             <input
               className="mono bg-white/5 border border-white/10 text-white text-sm px-4 py-2.5 rounded-l-lg outline-none placeholder-white/20 focus:border-white/25 focus:bg-white/8 transition-all w-full md:w-72"
@@ -407,7 +417,6 @@ export default function ElectionDashboard() {
           </div>
         </div>
 
-        {/* Hint */}
         <div className="max-w-6xl mx-auto px-4 md:px-8 pb-3">
           <p className="mono text-[10px] text-white/18 tracking-widest">
             Try: "Balen Shah", "KP Oli", or a numeric ID like 125
@@ -417,8 +426,6 @@ export default function ElectionDashboard() {
 
       {/* ── MAIN CONTENT ── */}
       <main className="max-w-6xl mx-auto px-4 md:px-8 py-10">
-
-        {/* Page title */}
         <div className="mb-10">
           <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-none text-white mb-2">
             Election<br />
@@ -427,44 +434,35 @@ export default function ElectionDashboard() {
             </span>
           </h1>
           <p className="mono text-xs text-white/25 tracking-wider mt-3">
-            Powered by Ekantipur Election Data
+            Powered by Ekantipur Election Data · 2026
           </p>
         </div>
 
-        {/* ── Featured Matchup ── */}
         <MatchupCard balen={balenData} oli={oliData} />
 
-        {/* ── Search error ── */}
         {searchError && (
           <div className="fade-up mb-6 rounded-xl border border-red-500/20 bg-red-950/20 px-5 py-4 text-red-300 text-sm">
             ⚠ {searchError}
           </div>
         )}
 
-        {/* ── Search result ── */}
         {searchResult && !searching && (
           <div className="fade-up">
-            <p className="mono text-[10px] uppercase tracking-[0.25em] text-white/25 mb-4">
-              Search Result
-            </p>
+            <p className="mono text-[10px] uppercase tracking-[0.25em] text-white/25 mb-4">Search Result</p>
             <CandidateCard data={searchResult.data} id={searchResult.id} />
           </div>
         )}
 
-        {/* ── Empty prompt ── */}
         {!searchResult && !searchError && !searching && (
           <div className="text-center py-16 text-white/10 italic text-lg">
             Search for any candidate above to see their profile
           </div>
         )}
 
-        {/* ── Loading ── */}
         {searching && (
           <div className="flex flex-col items-center py-20 gap-4">
             <div className="w-8 h-8 border-2 border-white/10 border-t-white/60 rounded-full spinner" />
-            <p className="mono text-[11px] uppercase tracking-widest text-white/25 animate-pulse">
-              Fetching profile…
-            </p>
+            <p className="mono text-[11px] uppercase tracking-widest text-white/25 animate-pulse">Fetching profile…</p>
           </div>
         )}
       </main>
