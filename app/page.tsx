@@ -28,13 +28,13 @@ function resolveId(input: string): string | null {
 }
 
 function getVotes(data: CandidateData): number {
-  const key = Object.keys(data).find(k => k === "Total Votes")
-    ?? Object.keys(data).find(k => k.toLowerCase().includes("vote"));
-  if (!key) return 0;
-  const raw = (data[key] || "").replace(/,/g, "").trim();
+  // ONLY read "Total Votes" — never fall back to other fields
+  // to avoid picking up numbers from Birth Date, Age, etc.
+  const raw = (data["Total Votes"] || "").replace(/,/g, "").trim();
   if (!raw || raw === "--" || raw === "-") return 0;
   const parsed = parseInt(raw, 10);
-  return isNaN(parsed) ? 0 : parsed;
+  // Must be a realistic vote count (> 100) to avoid garbage values
+  return (!isNaN(parsed) && parsed > 100) ? parsed : 0;
 }
 
 function getName(data: CandidateData, fallback: string): string {
@@ -58,9 +58,12 @@ function isWon(data: CandidateData): boolean {
 }
 
 function isPending(data: CandidateData): boolean {
-  const raw = data["Election Result"] || data["Status"] || data["Result"] || "";
+  // Pending if: no result declared AND no votes counted yet
+  const result = (data["Election Result"] || "").trim();
   const votes = getVotes(data);
-  return raw === "--" || raw === "-" || raw === "" || votes === 0;
+  const noResult = result === "" || result === "--" || result === "-";
+  const noVotes = votes === 0;
+  return noResult && noVotes;
 }
 
 function splitFields(data: CandidateData) {
@@ -379,7 +382,7 @@ export default function ElectionDashboard() {
               Nepal
             </div>
             <div className="text-lg font-extrabold tracking-tight text-white leading-none">
-              Election <span className="text-indigo-400">Result</span> <span className="text-red-400">By Nk</span>
+              Election <span className="text-indigo-400">Database</span>
             </div>
           </div>
 
