@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useState, useEffect } from "react";
 
@@ -10,10 +10,10 @@ interface CandidateData {
 // ─── Name → ID map (extend as needed) ────────────────────────────
 const NAME_TO_ID: { [key: string]: string } = {
   "balen shah": "125",
-  "balen": "125",
+  balen: "125",
   "kp oli": "122",
   "kp sharma oli": "122",
-  "oli": "122",
+  oli: "122",
 };
 
 // ─── 2026 election date ───────────────────────────────────────────
@@ -33,7 +33,11 @@ function resolveId(input: string): string | null {
 function is2026Data(data: CandidateData): boolean {
   const electionDate = data["Election date"] || data["Election Date"] || "";
   // If it mentions 2017 or 2022 or anything not 2026, it's old data
-  if (electionDate.includes("2017") || electionDate.includes("2022") || electionDate.includes("2019")) {
+  if (
+    electionDate.includes("2017") ||
+    electionDate.includes("2022") ||
+    electionDate.includes("2019")
+  ) {
     return false;
   }
   // If it explicitly says 2026, it's new
@@ -52,19 +56,25 @@ function getVotes(data: CandidateData): number {
 }
 
 function getName(data: CandidateData, fallback: string): string {
-  return data["Candidate Name"] || data["Name"] || data["Candidate"] || fallback;
+  return (
+    data["Candidate Name"] || data["Name"] || data["Candidate"] || fallback
+  );
 }
 
 function getParty(data: CandidateData): string {
-  return data["Political Party"]
-    || data[Object.keys(data).find(k => k.toLowerCase().includes("party")) ?? ""]
-    || "—";
+  return (
+    data["Political Party"] ||
+    data[
+      Object.keys(data).find((k) => k.toLowerCase().includes("party")) ?? ""
+    ] ||
+    "—"
+  );
 }
 
 function getStatus(data: CandidateData): string {
   if (!is2026Data(data)) return ""; // don't show old result status
   const val = data["Election Result"] || data["Status"] || data["Result"] || "";
-  return (val === "--" || val === "-") ? "" : val;
+  return val === "--" || val === "-" ? "" : val;
 }
 
 function isWon(data: CandidateData): boolean {
@@ -83,11 +93,21 @@ function isPending(data: CandidateData): boolean {
 }
 
 function splitFields(data: CandidateData) {
-  const electionKeys = ["status", "result", "votes", "constituency", "position", "rank", "party", "symbol", "election date"];
+  const electionKeys = [
+    "status",
+    "result",
+    "votes",
+    "constituency",
+    "position",
+    "rank",
+    "party",
+    "symbol",
+    "election date",
+  ];
   const election: CandidateData = {};
   const personal: CandidateData = {};
   for (const [k, v] of Object.entries(data)) {
-    if (electionKeys.some(ek => k.toLowerCase().includes(ek))) {
+    if (electionKeys.some((ek) => k.toLowerCase().includes(ek))) {
       election[k] = v;
     } else {
       personal[k] = v;
@@ -96,11 +116,19 @@ function splitFields(data: CandidateData) {
   return { election, personal };
 }
 
-const BALEN_IMG = "https://preview.redd.it/why-i-think-balen-shah-is-nepals-most-visionary-leader-v0-o7jiypk1kc8f1.jpeg?width=640&crop=smart&auto=webp&s=63109a58c287c1843435d50745b8b7543e1f6e7f";
-const OLI_IMG = "https://rpcdn.ratopati.com/media/albums/kp_oli_ms3RYqvNlQ_VrljCy3gJJ.jpg";
+const BALEN_IMG =
+  "https://preview.redd.it/why-i-think-balen-shah-is-nepals-most-visionary-leader-v0-o7jiypk1kc8f1.jpeg?width=640&crop=smart&auto=webp&s=63109a58c287c1843435d50745b8b7543e1f6e7f";
+const OLI_IMG =
+  "https://rpcdn.ratopati.com/media/albums/kp_oli_ms3RYqvNlQ_VrljCy3gJJ.jpg";
 
 // ─── Featured matchup card ────────────────────────────────────────
-function MatchupCard({ balen, oli }: { balen: CandidateData | null; oli: CandidateData | null }) {
+function MatchupCard({
+  balen,
+  oli,
+}: {
+  balen: CandidateData | null;
+  oli: CandidateData | null;
+}) {
   const balenVotes = balen ? getVotes(balen) : 0;
   const oliVotes = oli ? getVotes(oli) : 0;
   const total = balenVotes + oliVotes || 1;
@@ -111,100 +139,137 @@ function MatchupCard({ balen, oli }: { balen: CandidateData | null; oli: Candida
   const oliPending = oli ? isPending(oli) : true;
 
   return (
-    <div className="rounded-2xl border border-white/10 overflow-hidden mb-8" style={{ background: "linear-gradient(135deg, #0d1a10 0%, #0a0a18 50%, #1a0d0d 100%)" }}>
+    <div
+      className="rounded-2xl border border-white/10 overflow-hidden mb-8"
+      style={{
+        background:
+          "linear-gradient(135deg, #0d1a10 0%, #0a0a18 50%, #1a0d0d 100%)",
+      }}
+    >
       {/* Label */}
-      <div className="px-6 pt-5 pb-0">
-        <p className="text-[10px] font-mono tracking-[0.3em] uppercase text-white/25">
+      <div className="px-4 pt-4 pb-0">
+        <p className="text-[9px] font-mono tracking-[0.25em] uppercase text-white/25">
           ⚡ Featured Matchup · 2026 Election
         </p>
       </div>
 
       {/* Main matchup row */}
-      <div className="flex items-end gap-0 px-4 md:px-8 pt-4 pb-0">
-
+      <div className="flex items-start gap-0 px-3 md:px-8 pt-4 pb-0">
         {/* ── Balen ── */}
-        <div className="flex-1 flex flex-col items-center text-center">
-          <div className="relative mb-4">
-            <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-2 border-emerald-500/40 shadow-lg shadow-emerald-900/40">
-              <img src={BALEN_IMG} alt="Balen Shah" className="w-full h-full object-cover object-top" />
+        <div className="flex-1 flex flex-col items-center text-center min-w-0">
+          <div className="relative mb-5">
+            <div className="w-16 h-16 md:w-28 md:h-28 rounded-full overflow-hidden border-2 border-emerald-500/40 shadow-lg shadow-emerald-900/40">
+              <img
+                src={BALEN_IMG}
+                alt="Balen Shah"
+                className="w-full h-full object-cover object-top"
+              />
             </div>
-            <span className={`absolute -bottom-1 left-1/2 -translate-x-1/2 text-white text-[9px] font-mono tracking-widest uppercase px-2 py-0.5 rounded-full whitespace-nowrap ${
-              balenPending ? "bg-yellow-600" : isWon(balen!) ? "bg-emerald-600" : "bg-red-700"
-            }`}>
-              {balenPending ? "⏳ Pending" : isWon(balen!) ? "✓ Won" : "✗ Lost"}
+            <span
+              className={`absolute -bottom-1 left-1/2 -translate-x-1/2 text-white text-[8px] font-mono tracking-wide uppercase px-1.5 py-0.5 rounded-full whitespace-nowrap ${
+                balenPending
+                  ? "bg-yellow-600"
+                  : isWon(balen!)
+                    ? "bg-emerald-600"
+                    : "bg-red-700"
+              }`}
+            >
+              {balenPending ? "⏳" : isWon(balen!) ? "✓ Won" : "✗ Lost"}
             </span>
           </div>
 
-          <div className="text-base md:text-lg font-bold text-white leading-tight mb-0.5">
+          <div className="text-xs md:text-base font-bold text-white leading-tight mb-0.5 px-1 truncate w-full">
             {balen ? getName(balen, "Balen Shah") : "Balen Shah"}
           </div>
-          <div className="text-[10px] text-white/35 font-mono mb-3 truncate max-w-full px-2">
+          <div className="text-[9px] text-white/30 font-mono mb-2 truncate w-full px-1">
             {balen ? getParty(balen) : "—"}
           </div>
-          <div className="text-3xl md:text-4xl font-black tabular-nums text-emerald-300 leading-none">
+          <div className="text-2xl md:text-4xl font-black tabular-nums text-emerald-300 leading-none">
             {balen ? balenVotes.toLocaleString() : "—"}
           </div>
-          <div className="text-[9px] text-white/25 font-mono tracking-widest uppercase mt-1">votes</div>
-          <div className="md:text-xs font-bold text-emerald-400/70 mt-1 font-mono">
+          <div className="text-[8px] text-white/25 font-mono tracking-widest uppercase mt-1">
+            votes
+          </div>
+          <div className="text-[10px] md:text-xs font-bold text-emerald-400/70 mt-1 font-mono">
             {balenVotes > 0 ? balenPct + "%" : "—"}
           </div>
         </div>
 
         {/* ── VS divider ── */}
-        <div className="flex flex-col items-center gap-2 flex-shrink-0 pb-10 px-2 md:px-4">
-          <div className="w-px h-16 bg-gradient-to-b from-transparent via-white/10 to-transparent" />
-          <div className="w-9 h-9 rounded-full border border-white/15 bg-white/5 flex items-center justify-center text-white/40 text-xs font-black">
+        <div className="flex flex-col items-center gap-1.5 flex-shrink-0 pt-6 px-1 md:px-4">
+          <div className="w-px h-10 md:h-16 bg-gradient-to-b from-transparent via-white/10 to-transparent" />
+          <div className="w-7 h-7 md:w-9 md:h-9 rounded-full border border-white/15 bg-white/5 flex items-center justify-center text-white/40 text-[10px] md:text-xs font-black">
             VS
           </div>
-          <div className="w-px h-16 bg-gradient-to-b from-transparent via-white/10 to-transparent" />
+          <div className="w-px h-10 md:h-16 bg-gradient-to-b from-transparent via-white/10 to-transparent" />
         </div>
 
         {/* ── KP Oli ── */}
-        <div className="flex-1 flex flex-col items-center text-center">
-          <div className="relative mb-4">
-            <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-2 border-red-500/40 shadow-lg shadow-red-900/40">
-              <img src={OLI_IMG} alt="KP Sharma Oli" className="w-full h-full object-cover object-top" />
+        <div className="flex-1 flex flex-col items-center text-center min-w-0">
+          <div className="relative mb-5">
+            <div className="w-16 h-16 md:w-28 md:h-28 rounded-full overflow-hidden border-2 border-red-500/40 shadow-lg shadow-red-900/40">
+              <img
+                src={OLI_IMG}
+                alt="KP Sharma Oli"
+                className="w-full h-full object-cover object-top"
+              />
             </div>
-            <span className={`absolute -bottom-1 left-1/2 -translate-x-1/2 text-white text-[9px] font-mono tracking-widest uppercase px-2 py-0.5 rounded-full whitespace-nowrap ${
-              oliPending ? "bg-yellow-600" : isWon(oli!) ? "bg-emerald-600" : "bg-red-700"
-            }`}>
-              {oliPending ? "⏳ Pending" : isWon(oli!) ? "✓ Won" : "✗ Lost"}
+            <span
+              className={`absolute -bottom-1 left-1/2 -translate-x-1/2 text-white text-[8px] font-mono tracking-wide uppercase px-1.5 py-0.5 rounded-full whitespace-nowrap ${
+                oliPending
+                  ? "bg-yellow-600"
+                  : isWon(oli!)
+                    ? "bg-emerald-600"
+                    : "bg-red-700"
+              }`}
+            >
+              {oliPending ? "⏳" : isWon(oli!) ? "✓ Won" : "✗ Lost"}
             </span>
           </div>
 
-          <div className="text-base md:text-lg font-bold text-white leading-tight mb-0.5">
+          <div className="text-xs md:text-base font-bold text-white leading-tight mb-0.5 px-1 truncate w-full">
             {oli ? getName(oli, "KP Sharma Oli") : "KP Sharma Oli"}
           </div>
-          <div className="text-[10px] text-white/35 font-mono mb-3 truncate max-w-full px-2">
+          <div className="text-[9px] text-white/30 font-mono mb-2 truncate w-full px-1">
             {oli ? getParty(oli) : "—"}
           </div>
-          <div className="text-3xl md:text-4xl font-black tabular-nums text-red-300 leading-none">
-            {/* Always show 0 if old data, never show 57,139 from 2017 */}
+          <div className="text-2xl md:text-4xl font-black tabular-nums text-red-300 leading-none">
             {oli ? oliVotes.toLocaleString() : "—"}
           </div>
-          <div className="text-[9px] text-white/25 font-mono tracking-widest uppercase mt-1">votes</div>
-          <div className="md:text-xs font-bold text-red-400/70 mt-1 font-mono">
+          <div className="text-[8px] text-white/25 font-mono tracking-widest uppercase mt-1">
+            votes
+          </div>
+          <div className="text-[10px] md:text-xs font-bold text-red-400/70 mt-1 font-mono">
             {oliVotes > 0 ? oliPct + "%" : "—"}
           </div>
         </div>
       </div>
 
       {/* Vote bar */}
-      <div className="px-6 md:px-8 py-5">
+      <div className="px-4 md:px-8 py-4">
         {balen && oli && (balenVotes > 0 || oliVotes > 0) ? (
           <>
-            <div className="flex rounded-full overflow-hidden h-2.5 bg-white/5 mb-2">
-              <div className="bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-1000 ease-out" style={{ width: `${balenPct}%` }} />
-              <div className="bg-gradient-to-r from-red-500 to-red-700 transition-all duration-1000 ease-out" style={{ width: `${oliPct}%` }} />
+            <div className="flex rounded-full overflow-hidden h-2 bg-white/5 mb-2">
+              <div
+                className="bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-1000 ease-out"
+                style={{ width: `${balenPct}%` }}
+              />
+              <div
+                className="bg-gradient-to-r from-red-500 to-red-700 transition-all duration-1000 ease-out"
+                style={{ width: `${oliPct}%` }}
+              />
             </div>
             <div className="flex justify-center">
-              <span className="mono text-[10px] text-white/20 tracking-widest">
-                Total votes cast: <span className="text-white/40 font-bold">{(balenVotes + oliVotes).toLocaleString()}</span>
+              <span className="mono text-[9px] text-white/20 tracking-widest">
+                Total:{" "}
+                <span className="text-white/40 font-bold">
+                  {(balenVotes + oliVotes).toLocaleString()}
+                </span>
               </span>
             </div>
           </>
         ) : (
-          <div className="text-center text-yellow-400/40 text-xs font-mono py-2">
+          <div className="text-center text-yellow-400/40 text-[10px] font-mono py-1">
             ⏳ 2026 results not yet available — counting in progress
           </div>
         )}
@@ -229,11 +294,15 @@ function CandidateCard({ data, id }: { data: CandidateData; id: string }) {
   const isOld = !is2026Data(data);
 
   return (
-    <div className={`rounded-2xl border p-6 transition-all duration-500 ${
-      pending ? "border-yellow-500/15 bg-yellow-950/10" :
-      won ? "border-emerald-500/20 bg-emerald-950/20"
-          : "border-red-500/20 bg-red-950/20"
-    }`}>
+    <div
+      className={`rounded-2xl border p-6 transition-all duration-500 ${
+        pending
+          ? "border-yellow-500/15 bg-yellow-950/10"
+          : won
+            ? "border-emerald-500/20 bg-emerald-950/20"
+            : "border-red-500/20 bg-red-950/20"
+      }`}
+    >
       {/* Old data warning banner */}
       {isOld && (
         <div className="mb-5 rounded-lg border border-yellow-500/20 bg-yellow-900/20 px-4 py-3 text-yellow-300/70 text-xs font-mono flex items-center gap-2">
@@ -244,20 +313,36 @@ function CandidateCard({ data, id }: { data: CandidateData; id: string }) {
       {/* Hero */}
       <div className="flex items-center gap-5 mb-6">
         {photo && (
-          <div className={`w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden flex-shrink-0 border-2 ${pending ? "border-yellow-500/40" : won ? "border-emerald-500/40" : "border-red-500/40"} shadow-lg`}>
-            <img src={photo} alt={name} className="w-full h-full object-cover object-top" />
+          <div
+            className={`w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden flex-shrink-0 border-2 ${pending ? "border-yellow-500/40" : won ? "border-emerald-500/40" : "border-red-500/40"} shadow-lg`}
+          >
+            <img
+              src={photo}
+              alt={name}
+              className="w-full h-full object-cover object-top"
+            />
           </div>
         )}
         <div>
-          <div className={`text-[10px] font-mono tracking-[0.25em] uppercase mb-1.5 ${won ? "text-emerald-400/60" : "text-red-400/60"}`}>
+          <div
+            className={`text-[10px] font-mono tracking-[0.25em] uppercase mb-1.5 ${won ? "text-emerald-400/60" : "text-red-400/60"}`}
+          >
             Candidate #{id}
           </div>
-          <h2 className={`text-2xl md:text-3xl font-bold mb-2 ${won ? "text-emerald-300" : pending ? "text-yellow-200" : "text-red-300"}`}>
+          <h2
+            className={`text-2xl md:text-3xl font-bold mb-2 ${won ? "text-emerald-300" : pending ? "text-yellow-200" : "text-red-300"}`}
+          >
             {name}
           </h2>
-          <span className={`inline-block text-[10px] font-mono tracking-[0.15em] uppercase px-3 py-1 rounded ${
-            pending ? "bg-yellow-700/80 text-white" : won ? "bg-emerald-600 text-white" : "bg-red-700 text-white"
-          }`}>
+          <span
+            className={`inline-block text-[10px] font-mono tracking-[0.15em] uppercase px-3 py-1 rounded ${
+              pending
+                ? "bg-yellow-700/80 text-white"
+                : won
+                  ? "bg-emerald-600 text-white"
+                  : "bg-red-700 text-white"
+            }`}
+          >
             {pending ? "⏳ Result Pending" : getStatus(data)}
           </span>
         </div>
@@ -270,11 +355,21 @@ function CandidateCard({ data, id }: { data: CandidateData; id: string }) {
             Election Results
           </p>
           {Object.entries(election)
-            .filter(([k]) => !["Name", "Candidate Name", "Status", "Result"].includes(k))
+            .filter(
+              ([k]) =>
+                !["Name", "Candidate Name", "Status", "Result"].includes(k),
+            )
             .map(([key, value]) => (
-              <div key={key} className="flex justify-between items-start py-2.5 border-b border-white/5 last:border-0 gap-4">
-                <span className="text-[11px] font-mono uppercase tracking-wider text-white/30 flex-shrink-0">{key}</span>
-                <span className="text-sm text-white/80 text-right">{value || "—"}</span>
+              <div
+                key={key}
+                className="flex justify-between items-start py-2.5 border-b border-white/5 last:border-0 gap-4"
+              >
+                <span className="text-[11px] font-mono uppercase tracking-wider text-white/30 flex-shrink-0">
+                  {key}
+                </span>
+                <span className="text-sm text-white/80 text-right">
+                  {value || "—"}
+                </span>
               </div>
             ))}
         </div>
@@ -289,9 +384,16 @@ function CandidateCard({ data, id }: { data: CandidateData; id: string }) {
           {Object.entries(personal)
             .filter(([k]) => !["Name", "Candidate Name"].includes(k))
             .map(([key, value]) => (
-              <div key={key} className="flex justify-between items-start py-2.5 border-b border-white/5 last:border-0 gap-4">
-                <span className="text-[11px] font-mono uppercase tracking-wider text-white/30 flex-shrink-0">{key}</span>
-                <span className="text-sm text-white/80 text-right">{value || "—"}</span>
+              <div
+                key={key}
+                className="flex justify-between items-start py-2.5 border-b border-white/5 last:border-0 gap-4"
+              >
+                <span className="text-[11px] font-mono uppercase tracking-wider text-white/30 flex-shrink-0">
+                  {key}
+                </span>
+                <span className="text-sm text-white/80 text-right">
+                  {value || "—"}
+                </span>
               </div>
             ))}
         </div>
@@ -316,7 +418,10 @@ function CandidateCard({ data, id }: { data: CandidateData; id: string }) {
 // ─── Main Page ────────────────────────────────────────────────────
 export default function ElectionDashboard() {
   const [query, setQuery] = useState("");
-  const [searchResult, setSearchResult] = useState<{ data: CandidateData; id: string } | null>(null);
+  const [searchResult, setSearchResult] = useState<{
+    data: CandidateData;
+    id: string;
+  } | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
@@ -327,8 +432,8 @@ export default function ElectionDashboard() {
     async function loadFeatured() {
       try {
         const [b, o] = await Promise.all([
-          fetch("/api/candidate/125").then(r => r.json()),
-          fetch("/api/candidate/122").then(r => r.json()),
+          fetch("/api/candidate/125").then((r) => r.json()),
+          fetch("/api/candidate/122").then((r) => r.json()),
         ]);
         setBalenData(b);
         setOliData(o);
@@ -345,7 +450,9 @@ export default function ElectionDashboard() {
 
     const id = resolveId(trimmed);
     if (!id) {
-      setSearchError(`Could not find a candidate named "${trimmed}". Try "Balen Shah", "KP Oli", or a numeric ID.`);
+      setSearchError(
+        `Could not find a candidate named "${trimmed}". Try "Balen Shah", "KP Oli", or a numeric ID.`,
+      );
       setSearchResult(null);
       return;
     }
@@ -358,7 +465,8 @@ export default function ElectionDashboard() {
       const res = await fetch(`/api/candidate/${id}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json: CandidateData = await res.json();
-      if (Object.keys(json).length === 0) throw new Error("No data found for this candidate.");
+      if (Object.keys(json).length === 0)
+        throw new Error("No data found for this candidate.");
       setSearchResult({ data: json, id });
     } catch (e) {
       setSearchError(e instanceof Error ? e.message : String(e));
@@ -391,9 +499,11 @@ export default function ElectionDashboard() {
       <header className="relative border-b border-white/5 bg-white/[0.02] backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 md:px-8 py-4 flex flex-col md:flex-row md:items-center gap-4 md:gap-0 md:justify-between">
           <div>
-            <div className="mono text-[9px] tracking-[0.3em] uppercase text-white/25 mb-0.5">Nepal</div>
+            <div className="mono text-[9px] tracking-[0.3em] uppercase text-white/25 mb-0.5">
+              Nepal
+            </div>
             <div className="text-lg font-extrabold tracking-tight text-white leading-none">
-              Election <span className="text-indigo-400">Database</span>
+              Election <span className="text-indigo-400">Result By NK</span>
             </div>
           </div>
 
@@ -402,8 +512,10 @@ export default function ElectionDashboard() {
               className="mono bg-white/5 border border-white/10 text-white text-sm px-4 py-2.5 rounded-l-lg outline-none placeholder-white/20 focus:border-white/25 focus:bg-white/8 transition-all w-full md:w-72"
               placeholder="Search by name or ID…"
               value={query}
-              onChange={e => setQuery(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && !searching && handleSearch()}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) =>
+                e.key === "Enter" && !searching && handleSearch()
+              }
             />
             <button
               onClick={handleSearch}
@@ -412,7 +524,9 @@ export default function ElectionDashboard() {
             >
               {searching ? (
                 <div className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full spinner" />
-              ) : "Go"}
+              ) : (
+                "Go"
+              )}
             </button>
           </div>
         </div>
@@ -428,8 +542,12 @@ export default function ElectionDashboard() {
       <main className="max-w-6xl mx-auto px-4 md:px-8 py-10">
         <div className="mb-10">
           <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-none text-white mb-2">
-            Election<br />
-            <span className="text-white/30 font-light italic" style={{ fontFamily: "'Syne', sans-serif" }}>
+            Election
+            <br />
+            <span
+              className="text-white/30 font-light italic"
+              style={{ fontFamily: "'Syne', sans-serif" }}
+            >
               Results
             </span>
           </h1>
@@ -448,7 +566,9 @@ export default function ElectionDashboard() {
 
         {searchResult && !searching && (
           <div className="fade-up">
-            <p className="mono text-[10px] uppercase tracking-[0.25em] text-white/25 mb-4">Search Result</p>
+            <p className="mono text-[10px] uppercase tracking-[0.25em] text-white/25 mb-4">
+              Search Result
+            </p>
             <CandidateCard data={searchResult.data} id={searchResult.id} />
           </div>
         )}
@@ -462,7 +582,9 @@ export default function ElectionDashboard() {
         {searching && (
           <div className="flex flex-col items-center py-20 gap-4">
             <div className="w-8 h-8 border-2 border-white/10 border-t-white/60 rounded-full spinner" />
-            <p className="mono text-[11px] uppercase tracking-widest text-white/25 animate-pulse">Fetching profile…</p>
+            <p className="mono text-[11px] uppercase tracking-widest text-white/25 animate-pulse">
+              Fetching profile…
+            </p>
           </div>
         )}
       </main>
